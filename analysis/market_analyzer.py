@@ -68,11 +68,29 @@ class MarketAnalyzer:
             "fund_flow": fund_flow,
         }
 
-    def generate_portfolio_advice(self, user_sectors: List[str]) -> List[Dict]:
+    def generate_portfolio_advice(self, user_sectors: List[str],
+                                   kronos_sector_preds: Optional[List[Dict]] = None) -> List[Dict]:
         """根据用户持仓板块生成建议
 
-        基于行业板块涨跌幅、成交量等数据给出具体建议。
+        基于行业板块涨跌幅、成交量等数据给出具体建议，
+        同时结合 Kronos AI 板块预测信号。
+
+        Args:
+            user_sectors: 用户持仓板块列表
+            kronos_sector_preds: Kronos 板块预测结果（可选）
         """
+        # 建立 Kronos 预测查找表（板块名 -> 预测）
+        kronos_map = {}
+        if kronos_sector_preds:
+            for kp in kronos_sector_preds:
+                name = kp.get("name", "")
+                if name:
+                    kronos_map[name] = kp
+                    # 同时用别名映射后的名称索引
+                    mapped = SECTOR_ALIAS.get(name)
+                    if mapped:
+                        kronos_map[mapped] = kp
+
         # 获取行业板块数据
         industry_data = self.a_share.get_board_industry_summary(top_n=90)
         all_sectors = (industry_data.get("gainers", []) +
@@ -119,7 +137,16 @@ class MarketAnalyzer:
             if up_count and down_count:
                 total = up_count + down_count
                 up_ratio = up_count / total * 100 if total > 0 else 0
-                advice += f" 板块内上涨占比{up_ratio:.0f}%({up_count}/{total}家)。"
+                advice += f" 板块内上涨占比{up_ratio:.0f}%({up_count}/{total}家)."
+
+            # 补充 Kronos AI 预测信号
+            kp = kronos_map.get(sector) or kronos_map.get(SECTOR_ALIAS.get(sector))
+            if kp:
+                kp_signal = kp.get("signal", "")
+                kp_trend = kp.get("trend", "")
+                kp_pct = kp.get("trend_pct", 0)
+                arrow = "📈" if kp_signal in ("看涨", "偏多") else "📉"
+                advice += f" [Kronos]{arrow}预测：{kp_trend}（{kp_pct:+.2f}%），信号：{kp_signal}"
 
             results.append({
                 "板块": sector,

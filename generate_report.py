@@ -41,7 +41,8 @@ def generate(include_kronos=True):
 
     print("  -> 持仓建议...")
     user_sectors = USER_PORTFOLIO_SECTORS or ["半导体", "证券", "白酒"]
-    advice = analyzer.generate_portfolio_advice(user_sectors)
+    kronos_sector_preds = summary.get("kronos_sector_predictions") if include_kronos else None
+    advice = analyzer.generate_portfolio_advice(user_sectors, kronos_sector_preds=kronos_sector_preds)
 
     print("  -> 生成报告...")
     content = render_report(summary, sectors, advice)
