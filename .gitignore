@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+*.egg
+
+# Environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# WeChat cache
+.wechat_cache.json
+
+# Secrets (contains AppSecret!)
+wechat_config.py
+
+# User portfolio config (personal)
+user_config.py
+
+# Reports (generated at runtime)
+reports/
+!reports/.gitkeep
+
+# Large model files (downloaded in CI from HuggingFace)
+Kronos-ai/models/
+Kronos-ai/__pycache__/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Git LFS pointer files (if any)
+*.safetensors
