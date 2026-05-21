@@ -105,40 +105,89 @@ class WeChatPublisher:
             print(f"[WeChat] token 请求异常: {e}")
         return None
 
-    def _markdown_to_wechat_html(self, md_content: str) -> str:
-        """将 Markdown 转为公众号可用的 HTML（简化版）"""
-        html_parts = ['<section style="padding: 10px 0;">']
+    @staticmethod
+    def _escape(text: str) -> str:
+        """HTML 转义"""
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-        for line in md_content.split("\n"):
-            line = line.strip()
+    @staticmethod
+    def _inline_format(text: str) -> str:
+        """处理行内格式：**bold** 和 emoji 保持原样"""
+        # 先 HTML 转义
+        text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        # 处理 **bold** -> <strong>
+        import re
+        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+        return text
+
+    def _markdown_to_wechat_html(self, md_content: str) -> str:
+        """将 Markdown 转为公众号可用的 HTML
+
+        微信图文消息支持有限 HTML，用 <section> + <p> + <strong> 组合。
+        """
+        html_parts = ['<section style="padding: 5px 0;">']
+        lines = md_content.split("\n")
+        i = 0
+
+        while i < len(lines):
+            line = lines[i].strip()
+
+            # 空行
             if not line:
-                html_parts.append('<p style="margin: 8px 0;">&nbsp;</p>')
-            elif line.startswith("# ") or line.startswith("## "):
+                i += 1
+                continue
+
+            # 分隔线 ---
+            if line == "---":
+                html_parts.append(
+                    '<p style="border-bottom: 1px solid #ddd; margin: 12px 0;"></p>'
+                )
+                i += 1
+                continue
+
+            # 标题 # 或 ##
+            if line.startswith("# ") or line.startswith("## "):
                 level = line.count("#")
-                text = line.lstrip("# ").strip()
-                size = "22px" if level == 1 else "18px"
+                text = self._inline_format(line.lstrip("# ").strip())
+                size = "20px" if level == 1 else "17px"
                 html_parts.append(
                     f'<p style="font-size: {size}; font-weight: bold; '
-                    f'margin: 16px 0 8px 0;">{text}</p>'
+                    f'margin: 14px 0 6px 0;">{text}</p>'
                 )
-            elif line.startswith("**") and line.endswith("**"):
-                text = line.strip("*")
+                i += 1
+                continue
+
+            # 纯 **bold** 行（如 **权重股表现：**）
+            if line.startswith("**") and line.endswith("**") and line.count("**") == 2:
+                text = self._inline_format(line.strip("*"))
                 html_parts.append(
-                    f'<p style="font-weight: bold; margin: 8px 0;">{text}</p>'
+                    f'<p style="font-weight: bold; margin: 6px 0;">{text}</p>'
                 )
-            elif line.startswith("- "):
-                text = line[2:]
+                i += 1
+                continue
+
+            # 列表项 - 开头
+            if line.startswith("- "):
+                text = self._inline_format(line[2:])
                 html_parts.append(
-                    f'<p style="margin: 4px 0; padding-left: 1em;">{text}</p>'
+                    f'<p style="margin: 3px 0; padding-left: 0.8em;">{text}</p>'
                 )
-            elif line.startswith("*"):
-                # 风险提示等
-                text = line.strip("*")
+                i += 1
+                continue
+
+            # 风险提示 *斜体*
+            if line.startswith("*") and line.endswith("*") and line.count("*") == 2:
+                text = self._escape(line.strip("*"))
                 html_parts.append(
-                    f'<p style="color: #888; font-size: 13px; margin: 4px 0;">{text}</p>'
+                    f'<p style="color: #999; font-size: 13px; margin: 4px 0;">{text}</p>'
                 )
-            else:
-                html_parts.append(f"<p>{line}</p>")
+                i += 1
+                continue
+
+            # 普通段落
+            text = self._inline_format(line)
+            html_parts.append(f'<p style="margin: 3px 0; line-height: 1.6;">{text}</p>')
+            i += 1
 
         html_parts.append("</section>")
         return "\n".join(html_parts)
