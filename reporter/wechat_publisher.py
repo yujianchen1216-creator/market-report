@@ -121,75 +121,48 @@ class WeChatPublisher:
         return text
 
     def _markdown_to_wechat_html(self, md_content: str) -> str:
-        """将 Markdown 转为公众号可用的 HTML
+        """将 Markdown 转为公众号可用的极简 HTML
 
-        微信图文消息支持有限 HTML，用 <section> + <p> + <strong> 组合。
+        微信只支持最基础的 HTML 标签，不能有复杂 CSS。
         """
-        html_parts = ['<section style="padding: 5px 0;">']
+        html_parts = []
         lines = md_content.split("\n")
         i = 0
 
         while i < len(lines):
             line = lines[i].strip()
 
-            # 空行
             if not line:
                 i += 1
                 continue
-
-            # 分隔线 ---
             if line == "---":
-                html_parts.append(
-                    '<p style="border-bottom: 1px solid #ddd; margin: 12px 0;"></p>'
-                )
+                html_parts.append("<hr/>")
                 i += 1
                 continue
-
-            # 标题 # 或 ##
             if line.startswith("# ") or line.startswith("## "):
-                level = line.count("#")
                 text = self._inline_format(line.lstrip("# ").strip())
-                size = "20px" if level == 1 else "17px"
-                html_parts.append(
-                    f'<p style="font-size: {size}; font-weight: bold; '
-                    f'margin: 14px 0 6px 0;">{text}</p>'
-                )
+                html_parts.append(f"<p><strong>{text}</strong></p>")
                 i += 1
                 continue
-
-            # 纯 **bold** 行（如 **权重股表现：**）
             if line.startswith("**") and line.endswith("**") and line.count("**") == 2:
                 text = self._inline_format(line.strip("*"))
-                html_parts.append(
-                    f'<p style="font-weight: bold; margin: 6px 0;">{text}</p>'
-                )
+                html_parts.append(f"<p><strong>{text}</strong></p>")
                 i += 1
                 continue
-
-            # 列表项 - 开头
             if line.startswith("- "):
                 text = self._inline_format(line[2:])
-                html_parts.append(
-                    f'<p style="margin: 3px 0; padding-left: 0.8em;">{text}</p>'
-                )
+                html_parts.append(f"<p>&nbsp;&nbsp;{text}</p>")
                 i += 1
                 continue
-
-            # 风险提示 *斜体*
             if line.startswith("*") and line.endswith("*") and line.count("*") == 2:
                 text = self._escape(line.strip("*"))
-                html_parts.append(
-                    f'<p style="color: #999; font-size: 13px; margin: 4px 0;">{text}</p>'
-                )
+                html_parts.append(f"<p style=\"color:#888;font-size:13px;\">{text}</p>")
                 i += 1
                 continue
-
-            # 普通段落
             text = self._inline_format(line)
-            html_parts.append(f'<p style="margin: 3px 0; line-height: 1.6;">{text}</p>')
+            html_parts.append(f"<p>{text}</p>")
             i += 1
 
-        html_parts.append("</section>")
         return "\n".join(html_parts)
 
     def _get_thumb_media_id(self, token: str) -> Optional[str]:
