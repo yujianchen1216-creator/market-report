@@ -202,22 +202,27 @@ class KronosAnalyzer:
                 return None
 
             board_code = match.iloc[0]['code']
+            board_name = match.iloc[0]['name']
             print(f"[Kronos] 板块 {sector_name} 代码: {board_code}")
 
-            # 获取板块指数历史数据
-            df_idx = ak.stock_board_industry_index_ths(symbol=board_code)
+            # 获取板块指数历史数据（传入板块名称，而非代码）
+            df_idx = ak.stock_board_industry_index_ths(
+                symbol=board_name,
+                start_date="20200101",
+                end_date=datetime.now().strftime("%Y%m%d"),
+            )
             if df_idx is None or df_idx.empty:
                 return None
 
-            # 重命名列为标准 OHLCV
+            # 重命名列为标准 OHLCV（同花顺返回中文列名）
             df_idx = df_idx.rename(columns={
-                'date': '日期', 'open': 'open', 'high': 'high',
-                'low': 'low', 'close': 'close', 'volume': 'volume'
+                '开盘价': 'open', '最高价': 'high', '最低价': 'low',
+                '收盘价': 'close', '成交量': 'volume', '成交额': 'amount',
             })
             df_idx = df_idx.set_index('日期')
             df_idx.index = pd.to_datetime(df_idx.index)
 
-            cutoff = pd.Timestamp.now() - pd.Timedelta(days=days_lookback + 10)
+            cutoff = pd.Timestamp.now() - pd.Timedelta(days=int((days_lookback + days_pred) * 2.5))
             df_idx = df_idx[df_idx.index >= cutoff]
 
             if len(df_idx) < days_lookback:

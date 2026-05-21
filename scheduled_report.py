@@ -4,6 +4,7 @@
   python scheduled_report.py midday    -> A股午盘 (11:30)
   python scheduled_report.py aclose    -> A股收盘 (15:00)
   python scheduled_report.py usclose   -> 美股收盘 (次日早 7:00)
+  python scheduled_report.py premarket -> 盘前指引 (09:20)
 """
 import sys
 import os
@@ -13,7 +14,7 @@ from datetime import datetime
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
-from generate_report import generate
+from generate_report import generate, generate_premarket
 from reporter.wechat_template import save_report
 
 LOG_DIR = os.path.join(BASE_DIR, "reports")
@@ -24,6 +25,7 @@ TITLE_PREFIX = {
     "midday": "A股午盘速览",
     "aclose": "A股收盘复盘",
     "usclose": "美股收盘简报",
+    "premarket": "盘前指引",
 }
 
 
@@ -37,8 +39,11 @@ def log(msg: str):
 def run_report(report_type: str):
     log(f"开始生成报告 [{report_type}]")
     try:
-        include_kronos = report_type != "midday"
-        content, filepath = generate(include_kronos=include_kronos)
+        if report_type == "premarket":
+            content, filepath = generate_premarket()
+        else:
+            include_kronos = report_type != "midday"
+            content, filepath = generate(include_kronos=include_kronos)
         log(f"报告完成 [{report_type}]: {filepath}")
 
         # 推送微信公众号
@@ -61,11 +66,11 @@ def run_report(report_type: str):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("用法: python scheduled_report.py [midday|aclose|usclose]")
+        print("用法: python scheduled_report.py [midday|aclose|usclose|premarket]")
         sys.exit(1)
 
     report_type = sys.argv[1]
-    if report_type not in ("midday", "aclose", "usclose"):
+    if report_type not in ("midday", "aclose", "usclose", "premarket"):
         print(f"未知报告类型: {report_type}")
         sys.exit(1)
 

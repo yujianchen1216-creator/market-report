@@ -59,10 +59,16 @@ def render_report(summary: Dict, sector_analysis: Dict, portfolio_advice: List[D
             lines.append(f"- 下跌：{down_names}")
         lines.append("")
 
-    # AI 预测（Kronos）
+    # 二、AI 智能预测（Kronos）
     kronos_preds = summary.get("kronos_predictions", [])
+    kronos_sector_preds = summary.get("kronos_sector_predictions", [])
+    if kronos_preds or kronos_sector_preds:
+        lines.append("---")
+        lines.append("## 二、AI 智能预测（Kronos）")
+        lines.append("")
+
     if kronos_preds:
-        lines.append("**AI 模型（Kronos）指数预测：**")
+        lines.append("**主要指数预测：**")
         lines.append("")
         for p in kronos_preds:
             name = p.get("name", p.get("symbol", "?"))
@@ -73,13 +79,31 @@ def render_report(summary: Dict, sector_analysis: Dict, portfolio_advice: List[D
             trend_pct = p.get("trend_pct", 0)
             if pred:
                 target = pred[-1]
-                pred_str = " → ".join([str(x) for x in [pred[0], pred[-1]]])
-                lines.append(f"- **{name}**: {curr:.2f} → {target:.2f}（{signal}，{trend_pct:+.2f}%）| 趋势：{trend}")
+                arrow = "📈" if signal in ("看涨", "偏多") else "📉"
+                lines.append(f"- {arrow} **{name}**: {curr:.2f} → {target:.2f}（{trend_pct:+.2f}%）")
+                lines.append(f"  · 趋势：{trend} | 信号：{signal}")
         lines.append("")
 
-    # 二、板块轮动
+    if kronos_sector_preds:
+        lines.append("**你的持仓板块预测：**")
+        lines.append("")
+        for p in kronos_sector_preds:
+            name = p.get("name", p.get("symbol", "?"))
+            curr = p.get("current", 0)
+            pred = p.get("prediction", [])
+            trend = p.get("trend", "")
+            signal = p.get("signal", "")
+            trend_pct = p.get("trend_pct", 0)
+            if pred:
+                target = pred[-1]
+                arrow = "📈" if signal in ("看涨", "偏多") else "📉"
+                lines.append(f"- {arrow} **{name}**: {curr:.2f} → {target:.2f}（{trend_pct:+.2f}%）")
+                lines.append(f"  · 趋势：{trend} | 信号：{signal}")
+        lines.append("")
+
+    # 三、板块轮动
     lines.append("---")
-    lines.append("## 二、板块轮动")
+    lines.append("## 三、板块轮动")
     lines.append("")
 
     industries = sector_analysis.get("industries", {})
@@ -130,9 +154,9 @@ def render_report(summary: Dict, sector_analysis: Dict, portfolio_advice: List[D
             lines.append(f"  {i}. {f.get('名称', '?')} （净流出{f.get('主力净流入', 'N/A')}）")
         lines.append("")
 
-    # 三、外围市场（影响次日A股）
+    # 四、外围市场（影响次日A股）
     lines.append("---")
-    lines.append("## 三、外围市场（影响次日A股）")
+    lines.append("## 四、外围市场（影响次日A股）")
     lines.append("")
 
     for gi in summary.get("global_indices", []):
@@ -151,14 +175,112 @@ def render_report(summary: Dict, sector_analysis: Dict, portfolio_advice: List[D
         lines.append(f"**北向资金：** 净流入/流出数据待补充")
         lines.append("")
 
-    # 四、持仓建议
+    # 五、持仓建议
     if portfolio_advice:
         lines.append("---")
-        lines.append("## 四、你的持仓板块操作建议")
+        lines.append("## 五、你的持仓板块操作建议")
         lines.append("")
         for adv in portfolio_advice:
             lines.append(f"**{adv['板块']}**：{adv['建议']}")
             lines.append("")
+
+    # 风险提示
+    lines.append("---")
+    lines.append("*风险提示：以上分析仅供参考，不构成投资建议。市场有风险，投资需谨慎。*")
+    lines.append("")
+    lines.append(f"*报告生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+
+    return "\n".join(lines)
+
+
+def render_premarket_report(global_indices: List[Dict],
+                            kronos_pred: Optional[Dict] = None,
+                            sector_preds: Optional[List[Dict]] = None) -> str:
+    """生成盘前指引报告
+
+    在 A 股开盘前发送，包含隔夜全球市场和 Kronos AI 预测。
+
+    Args:
+        global_indices: 全球指数数据
+        kronos_pred: Kronos 对 上证指数 的预测
+        sector_preds: Kronos 对持仓板块的预测
+    Returns:
+        Markdown 文本
+    """
+    lines = []
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    weekday = datetime.now().strftime("%A")
+
+    lines.append(f"# 盘前指引 | {date_str} {weekday}")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    # 一、隔夜外围市场
+    lines.append("## 一、隔夜外围市场")
+    lines.append("")
+
+    us_names = {"道琼斯", "纳斯达克综合", "标普500"}
+    asia_names = {"日经225", "韩国KOSPI", "恒生指数", "恒生科技指数"}
+
+    lines.append("**美股收盘：**")
+    lines.append("")
+    for gi in global_indices:
+        name = gi.get("name", "")
+        if name in us_names:
+            chg = gi.get("change_pct")
+            if chg is not None:
+                arrow = "📈" if chg > 0 else "📉"
+                lines.append(f"- {arrow} **{name}**: {gi.get('price', 0):.2f}（{chg:+.2f}%）")
+    lines.append("")
+
+    lines.append("**亚太市场（交易中）：**")
+    lines.append("")
+    for gi in global_indices:
+        name = gi.get("name", "")
+        if name in asia_names:
+            chg = gi.get("change_pct")
+            if chg is not None:
+                arrow = "📈" if chg > 0 else "📉"
+                lines.append(f"- {arrow} **{name}**: {gi.get('price', 0):.2f}（{chg:+.2f}%）")
+    lines.append("")
+
+    # 二、今日A股预测
+    lines.append("---")
+    lines.append("## 二、今日A股预测（Kronos AI）")
+    lines.append("")
+
+    if kronos_pred:
+        name = kronos_pred.get("name", "上证指数")
+        curr = kronos_pred.get("current", 0)
+        pred = kronos_pred.get("prediction", [])
+        trend = kronos_pred.get("trend", "")
+        signal = kronos_pred.get("signal", "")
+        trend_pct = kronos_pred.get("trend_pct", 0)
+        if pred:
+            target = pred[-1]
+            arrow = "📈" if signal in ("看涨", "偏多") else "📉"
+            lines.append(f"{arrow} **{name}**：{curr:.2f} → {target:.2f}")
+            lines.append("")
+            lines.append(f"- 预测趋势：{trend}")
+            lines.append(f"- 预测涨跌幅：{trend_pct:+.2f}%")
+            lines.append(f"- 信号强度：{signal}")
+    else:
+        lines.append("（Kronos 模型未加载，跳过预测）")
+    lines.append("")
+
+    # 持仓板块预测
+    if sector_preds:
+        lines.append("**你的持仓板块预测：**")
+        lines.append("")
+        for p in sector_preds:
+            name = p.get("name", p.get("symbol", "?"))
+            trend = p.get("trend", "")
+            signal = p.get("signal", "")
+            trend_pct = p.get("trend_pct", 0)
+            arrow = "📈" if signal in ("看涨", "偏多") else "📉"
+            lines.append(f"- {arrow} **{name}**: {trend}（{trend_pct:+.2f}%）信号：{signal}")
+        lines.append("")
 
     # 风险提示
     lines.append("---")

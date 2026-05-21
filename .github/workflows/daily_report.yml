@@ -4,6 +4,8 @@ on:
   schedule:
     # 北京时间 07:00 = UTC 23:00（前日）— 美股收盘
     - cron: "0 23 * * *"
+    # 北京时间 09:20 = UTC 01:20 — 盘前指引（仅工作日）
+    - cron: "20 1 * * 1-5"
     # 北京时间 11:30 = UTC 03:30 — A股午盘
     - cron: "30 3 * * *"
     # 北京时间 15:00 = UTC 07:00 — A股收盘
@@ -19,6 +21,7 @@ on:
           - midday
           - aclose
           - usclose
+          - premarket
 
 jobs:
   generate:
@@ -49,6 +52,8 @@ jobs:
             echo "type=${{ inputs.report_type }}" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event.schedule }}" == "0 23 * * *" ]]; then
             echo "type=usclose" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.schedule }}" == "20 1 * * 1-5" ]]; then
+            echo "type=premarket" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event.schedule }}" == "30 3 * * *" ]]; then
             echo "type=midday" >> $GITHUB_OUTPUT
           else

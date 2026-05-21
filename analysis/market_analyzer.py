@@ -6,6 +6,33 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import pandas as pd
 
+# 同花顺行业板块名称映射（用户常见叫法 -> THS 标准名）
+SECTOR_ALIAS = {
+    "新能源汽车": "汽车整车",
+    "新能源车": "汽车整车",
+    "光伏": "光伏设备",
+    "芯片": "半导体",
+    "AI": "计算机应用",
+    "人工智能": "计算机应用",
+    "医药": "生物制品",
+    "医疗": "生物制品",
+    "军工": "军工装备",
+    "锂电": "电池",
+    "锂电池": "电池",
+    "储能": "电力设备",
+    "券商": "证券",
+    "银行": "银行",
+    "煤炭": "煤炭开采加工",
+    "地产": "房地产开发",
+    "房地产": "房地产开发",
+    "保险": "保险及其他",
+    "消费": "食品加工制造",
+    "食品": "食品加工制造",
+    "通信": "通信服务",
+    "航运": "港口航运",
+    "航空": "机场航运",
+}
+
 
 class MarketAnalyzer:
     """市场分析器"""
@@ -46,33 +73,6 @@ class MarketAnalyzer:
 
         基于行业板块涨跌幅、成交量等数据给出具体建议。
         """
-        # 同花顺行业板块名称映射（用户常见叫法 -> THS 标准名）
-        SECTOR_ALIAS = {
-            "新能源汽车": "汽车整车",
-            "新能源车": "汽车整车",
-            "光伏": "光伏设备",
-            "芯片": "半导体",
-            "AI": "计算机应用",
-            "人工智能": "计算机应用",
-            "医药": "生物制品",
-            "医疗": "生物制品",
-            "军工": "军工装备",
-            "锂电": "电池",
-            "锂电池": "电池",
-            "储能": "电力设备",
-            "券商": "证券",
-            "银行": "银行",
-            "煤炭": "煤炭开采加工",
-            "地产": "房地产开发",
-            "房地产": "房地产开发",
-            "保险": "保险及其他",
-            "消费": "食品加工制造",
-            "食品": "食品加工制造",
-            "通信": "通信服务",
-            "航运": "港口航运",
-            "航空": "机场航运",
-        }
-
         # 获取行业板块数据
         industry_data = self.a_share.get_board_industry_summary(top_n=90)
         all_sectors = (industry_data.get("gainers", []) +
@@ -163,27 +163,46 @@ class MarketAnalyzer:
         ]
 
     def enrich_with_kronos(self, summary: Dict,
-                           kronos_symbols: Optional[List[str]] = None) -> Dict:
+                           kronos_symbols: Optional[List[str]] = None,
+                           sector_names: Optional[List[str]] = None) -> Dict:
         """用 Kronos AI 预测丰富报告数据
 
         Args:
             summary: generate_summary() 的输出
             kronos_symbols: 要预测的指数列表，默认四大指数
+            sector_names: 要预测的行业板块列表（用户持仓板块）
         Returns:
-            添加了 kronos_predictions 字段的 summary
+            添加了 kronos_predictions 和 kronos_sector_predictions 字段的 summary
         """
         try:
             from analysis.kronos_analyzer import KronosAnalyzer
             ka = KronosAnalyzer(device="cpu")
             ka.load()
             if ka.is_ready:
+                # 指数预测
                 preds = ka.predict_indices(kronos_symbols)
                 summary["kronos_predictions"] = preds
+
+                # 板块预测
+                if sector_names:
+                    sector_preds = []
+                    for sector in sector_names:
+                        mapped = SECTOR_ALIAS.get(sector, sector)
+                        try:
+                            pred = ka.predict_sector(mapped)
+                            if pred:
+                                pred["name"] = sector
+                                sector_preds.append(pred)
+                        except Exception as e:
+                            print(f"[Kronos] 板块预测失败 {sector}: {e}")
+                    summary["kronos_sector_predictions"] = sector_preds
             else:
                 summary["kronos_predictions"] = []
+                summary["kronos_sector_predictions"] = []
         except Exception as e:
             print(f"[Kronos] enrichment failed: {e}")
             summary["kronos_predictions"] = []
+            summary["kronos_sector_predictions"] = []
         return summary
 
     def _judge_market_character(self, df: pd.DataFrame) -> str:
